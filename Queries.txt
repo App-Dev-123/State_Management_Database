@@ -1,0 +1,113 @@
+# Query 1
+SELECT z.Zipcode, AVG(p.Sale_Price) AS Avg_Sale_Price
+FROM address_info a
+JOIN zipcode_info z ON a.Zipcode = z.Zipcode
+JOIN link_table l ON a.SBL = l.SBL
+JOIN price_info p ON l.Price_ID = p.Price_ID
+GROUP BY z.Zipcode;
+
+# Query 2
+select * from zipcode_info
+INSERT INTO zipcode_info (zipcode, state, city) Values ('14205', 'NY', 'Buffalo')
+select * from zipcode_info
+
+# Query 3
+select * from zipcode_info
+delete from zipcode_info where zipcode = '14205'
+select * from zipcode_info
+
+# Query 4
+select * from owner_info where owner1 = 'ROSS TRACEY L'
+update owner_info set previous_owner='ROSS TRACEY L',owner1 = 'ROSS K' where owner1 = 'ROSS TRACEY L'
+select * from owner_info where previous_owner = 'ROSS TRACEY L'
+
+# Query 5
+SELECT pr.Price_ID, pr.Land_Value, pr.Total_Value, pr.Sale_Price
+FROM price_info pr
+WHERE pr.Land_Value > (SELECT AVG(Land_Value) FROM price_info);
+
+# Query 6
+SELECT oi.Owner1, zi.City, COUNT(*) AS Property_Count
+FROM owner_info oi
+JOIN link_table lt ON oi.Owner_ID = lt.Owner_ID
+JOIN property_info pri ON lt.SBL = pri.SBL
+JOIN address_info ai ON pri.SBL = ai.SBL
+JOIN zipcode_info zi ON ai.Zipcode = zi.Zipcode
+GROUP BY oi.Owner1, zi.City
+HAVING COUNT(DISTINCT pri.SBL) > 1
+ORDER BY Property_Count DESC;
+
+# Query optimization indexing
+CREATE INDEX idx_property_class ON property_info(SBL);
+
+# Query 7
+SELECT di.*, ci.*
+FROM link_table lt
+JOIN deed_info di ON lt.Deed_ID = di.Deed_ID
+JOIN census_info ci ON lt.Census_ID = ci.Census_ID
+ORDER BY di.Deed_ID DESC;
+
+# Query optimization
+-- Index creation for link_table
+CREATE INDEX idx_link_table_owner_id ON link_table(Owner_ID);
+CREATE INDEX idx_link_table_deed_id ON link_table(Deed_ID);
+CREATE INDEX idx_link_table_price_id ON link_table(Price_ID);
+CREATE INDEX idx_link_table_census_id ON link_table(Census_ID);
+
+-- Index creation for census_info
+CREATE INDEX idx_census_info_census_id ON census_info(Census_ID);
+
+-- Create indexes for the columns used in ORDER BY clause
+CREATE INDEX idx_deed_id_desc ON deed_info(Deed_ID DESC);
+
+# Query 8
+SELECT oi.Owner1, SUM(pi.Total_Value) AS Total_Property_Value
+FROM owner_info oi
+JOIN link_table lt ON oi.Owner_ID = lt.Owner_ID
+JOIN price_info pi ON lt.Price_ID = pi.Price_ID
+GROUP BY oi.Owner1
+ORDER BY Total_Property_Value DESC
+LIMIT 5;
+
+# Query 9
+SELECT ci.Census_Tract, COUNT(lt.SBL) AS Property_Count
+FROM census_info ci
+LEFT JOIN link_table lt ON ci.Census_ID = lt.Census_ID
+GROUP BY ci.Census_Tract
+ORDER BY Property_Count DESC;
+
+# Query 10
+SELECT pi.SBL, pi.Property_Class, pr.Sale_Price
+FROM link_table lt
+JOIN property_info pi ON lt.SBL = pi.SBL
+JOIN price_info pr ON lt.Price_ID = pr.Price_ID
+WHERE pr.Sale_Price = (SELECT MAX(Sale_Price) FROM price_info);
+
+# Query 11
+CREATE OR REPLACE FUNCTION update_property_class()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.Property_Class NOT IN (SELECT Property_Class FROM property_class_info) THEN
+        INSERT INTO property_class_info (Property_Class, Property_Class_Description)
+        VALUES (NEW.Property_Class, NULL);
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_property_class_trigger
+AFTER INSERT ON property_info
+FOR EACH ROW
+EXECUTE FUNCTION update_property_class();
+
+select * from property_class_info
+
+INSERT INTO property_info (SBL, Front, Depth, Property_Class, Total_Living_Area)
+VALUES ('123456789', 50, 100, '211', 2000);
+
+# Query 12
+SELECT pc.Property_Class_Description, COUNT(p.SBL) AS Num_Properties
+FROM property_info p
+JOIN property_class_info pc ON p.Property_Class = pc.Property_Class
+GROUP BY pc.Property_Class_Description
+ORDER BY Num_Properties DESC;
